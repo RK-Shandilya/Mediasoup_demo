@@ -18,7 +18,7 @@ const consumers = new Map();  // (consumerId -> { consumer, peerId })
 const createWorker = async () => {
   worker = await mediasoup.createWorker();
   router = await worker.createRouter({ mediaCodecs: mediasoupOptions.mediaCodecs });
-  console.log("Mediasoup worker and router created");
+
 };
 
 createWorker();
@@ -35,12 +35,6 @@ const createWebRtcTransport = async () => {
       dtlsParameters: transport.dtlsParameters,
     },
   };
-};
-
-const createConsumerTransport = async (producerId, consumer) => {
-  const { transport, params } = await createWebRtcTransport();
-  consumer.transport = transport;
-  return params;
 };
 
 // Update the notifyNewProducer function
@@ -79,7 +73,6 @@ wss.on("connection", (ws) => {
   const peerId = uuid();
   peers.set(peerId, ws);
   transports.set(peerId, new Map());
-  console.log(`Peer ${peerId} connected`);
 
   // Send router RTP capabilities and active producers to the new peer
   ws.send(JSON.stringify({
@@ -93,7 +86,6 @@ wss.on("connection", (ws) => {
 
   ws.on("message", async (message) => {
     const { action, data } = JSON.parse(message);
-    console.log('Received action:', action, 'from peer:', peerId);
 
     try {
       switch (action) {
@@ -116,7 +108,6 @@ wss.on("connection", (ws) => {
 
         case "produce": {
             const transport = transports.get(peerId).get('producer');
-            console.log("Creating producer:", { peerId, kind: data.kind });
             
             const producer = await transport.produce({
               kind: data.kind,
@@ -124,10 +115,8 @@ wss.on("connection", (ws) => {
             });
           
             producers.set(producer.id, { producer, peerId });
-            console.log(`Producer created: ${producer.id} (${data.kind})`);
             
             producer.on("transportclose", () => {
-              console.log(`Producer transport closed: ${producer.id}`);
               producer.close();
               producers.delete(producer.id);
             });
@@ -244,7 +233,6 @@ wss.on("connection", (ws) => {
   });
 
   ws.on("close", () => {
-    console.log(`Peer ${peerId} disconnected`);
     
     // Close all transports
     const peerTransports = transports.get(peerId);

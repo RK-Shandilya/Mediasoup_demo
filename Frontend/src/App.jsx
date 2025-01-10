@@ -20,7 +20,6 @@ const App = () => {
 
     socket.onmessage = async (event) => {
       const { action, data } = JSON.parse(event.data);
-      console.log("Received action:", action, data);
       await handleServerMessage(action, data);
     };
 
@@ -30,19 +29,6 @@ const App = () => {
 
     return () => socket.close();
   }, []);
-
-  const ensureRemoteStream = (peerId) => {
-    setRemoteStreams(prev => {
-      if (!prev[peerId]) {
-        console.log("Creating new MediaStream for peer:", peerId);
-        return {
-          ...prev,
-          [peerId]: new MediaStream()
-        };
-      }
-      return prev;
-    });
-  };
 
 
   const handleServerMessage = async (action, data) => {
@@ -57,13 +43,11 @@ const App = () => {
         
         // Handle existing producers before creating producer transport
         if (data.existingProducers && data.existingProducers.length > 0) {
-          console.log("Handling existing producers:", data.existingProducers);
           // Create consumer transport first to handle existing producers
           socket.send(JSON.stringify({ action: "createConsumerTransport" }));
           
           // Store the producers to consume after transport is created
           data.existingProducers.forEach(({producerId, peerId, kind}) => {
-            console.log("Storing existing producer for consumption:", producerId, peerId, kind);
             pendingConsumes.current.set(producerId, { peerId, kind });
           });
         } else {
@@ -87,7 +71,6 @@ const App = () => {
           // Produce video first
           const videoTrack = stream.getVideoTracks()[0];
           if (videoTrack) {
-            console.log("Producing video track");
             await transport.produce({ 
               track: videoTrack,
               kind: 'video',
@@ -102,7 +85,6 @@ const App = () => {
           // Then produce audio
           const audioTrack = stream.getAudioTracks()[0];
           if (audioTrack) {
-            console.log("Producing audio track");
             await transport.produce({ 
               track: audioTrack,
               kind: 'audio'
@@ -115,7 +97,6 @@ const App = () => {
 
       case "newProducer": {
         const { producerId, peerId, kind } = data;
-        console.log("New producer received:", producerId, peerId, kind);
 
         if (!consumerTransportRef.current) {
           pendingConsumes.current.set(producerId, { peerId, kind });
@@ -143,7 +124,6 @@ const App = () => {
 
           // Consume all pending producers
           for (const [producerId, info] of pendingConsumes.current) {
-            console.log("Consuming pending producer:", producerId, info);
             socket.send(JSON.stringify({
               action: "consume",
               data: {
@@ -166,7 +146,6 @@ const App = () => {
       case "consumerCreated": {
         try {
           const { producerId, id, kind, rtpParameters, producerPeerId } = data;
-          console.log("Creating consumer:", producerId, kind, producerPeerId);
           
           const transport = consumerTransportRef.current;
           if (!transport) {
@@ -203,16 +182,6 @@ const App = () => {
             
             // Add the new track
             stream.addTrack(consumer.track);
-            
-            console.log(`Added ${kind} track to stream:`, {
-              peerId: producerPeerId,
-              trackId: consumer.track.id,
-              enabled: consumer.track.enabled,
-              muted: consumer.track.muted,
-              videoTracks: stream.getVideoTracks().length,
-              audioTracks: stream.getAudioTracks().length
-            });
-
             return prev;
           });
 
